@@ -1,0 +1,22 @@
+# Notebooks (contain credentials and outputs)
+notebooks/
+
+# Certificates
+*.crt
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
