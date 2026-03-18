@@ -35,7 +35,25 @@ jobs:
         run: ruff check src/
 
       - name: Run tests
-        run: pytest tests/ -v
+        run: pytest tests/ -v --junitxml=test-results.xml
+
+      - name: Update test count badge
+        if: matrix.python-version == '3.13' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          PASSED=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          root = ET.parse('test-results.xml').getroot()
+          ts = root if root.tag == 'testsuite' else root.find('testsuite')
+          print(ts.get('tests', '0'))
+          ")
+          # Update gist with badge JSON
+          echo "{\"schemaVersion\":1,\"label\":\"tests\",\"message\":\"${PASSED} passed\",\"color\":\"brightgreen\"}" > badge.json
+          curl -sS -X PATCH \
+            -H "Authorization: token ${{ secrets.PREKIT_REPO_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/gists/${{ vars.BADGE_GIST_ID }}" \
+            -d "{\"files\":{\"prekit-sdk-tests.json\":{\"content\":$(python3 -c "import json; print(json.dumps(open('badge.json').read()))")}}}" \
+            > /dev/null
 
   build-wheel:
     runs-on: ubuntu-latest

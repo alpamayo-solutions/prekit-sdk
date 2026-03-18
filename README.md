@@ -1,6 +1,7 @@
 # prekit-sdk
 
 [![CI](https://github.com/alpamayo-solutions/prekit-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/alpamayo-solutions/prekit-sdk/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tillschoepe/613c7b84a2ad84e582b44126cd99fa3b/raw/prekit-sdk-tests.json)](https://github.com/alpamayo-solutions/prekit-sdk/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
