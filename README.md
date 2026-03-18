@@ -6,6 +6,13 @@
 
 User-friendly Python SDK for the PREKIT edge computing platform. Django-inspired API, self-documenting objects, pandas-native data access.
 
+## Architecture
+
+<figure>
+<img src="docs/architecture.svg" alt="SDK Architecture" />
+<figcaption>How prekit-sdk wraps the auto-generated API client. The __getattr__ proxy in models.py is the critical boundary — new fields from client regeneration appear automatically.</figcaption>
+</figure>
+
 ## Installation
 
 ```bash
