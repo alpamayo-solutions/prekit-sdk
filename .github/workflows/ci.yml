@@ -21,11 +21,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install API client from latest GitHub Release
+      - name: Download API client wheel from private repo
+        env:
+          GH_TOKEN: ${{ secrets.PREKIT_REPO_TOKEN }}
         run: |
-          pip install prekit-edge-node-api \
-            --find-links https://github.com/alpamayo-solutions/prekit/releases/latest/download/ \
-            || pip install prekit-edge-node-api --pre --find-links https://github.com/alpamayo-solutions/prekit/releases/
+          gh release download --repo alpamayo-solutions/prekit --pattern "prekit_edge_node_api-*.whl" --dir /tmp/wheels
+          pip install /tmp/wheels/prekit_edge_node_api-*.whl
 
       - name: Install SDK with dev dependencies
         run: pip install -e ".[dev]"
