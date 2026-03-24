@@ -27,13 +27,34 @@ pip install git+https://github.com/alpamayo-solutions/prekit-sdk.git
 pip install -e "./prekit-sdk[dev]"
 ```
 
+## CA Certificate
+
+PREKIT deployments use a private PKI. The root CA certificate is included in this repo at [`certs/alpamayo-root-ca.crt`](certs/alpamayo-root-ca.crt).
+
+```
+SHA-256 Fingerprint: 62:96:51:A7:63:CC:14:B3:74:2A:BB:4B:A3:7A:17:20:5E:6D:58:9F:46:E9:CC:D8:E6:38:94:FE:3B:3C:7C:5C
+Valid: 2025-04-30 to 2035-04-28
+```
+
+Pass it when connecting:
+
+```python
+pk = Prekit.connect(url="https://edge.local", api_key="my-key", ca_cert="certs/alpamayo-root-ca.crt")
+```
+
+Or download it directly:
+
+```bash
+curl -O https://raw.githubusercontent.com/alpamayo-solutions/prekit-sdk/main/certs/alpamayo-root-ca.crt
+```
+
 ## Quick Start
 
 ```python
 from prekit_sdk import Prekit
 
 # Connect with API key
-pk = Prekit.connect(url="https://edge.local", api_key="my-key", verify_ssl=False)
+pk = Prekit.connect(url="https://edge.local", api_key="my-key", ca_cert="certs/alpamayo-root-ca.crt")
 
 # Browse the asset tree
 pk.tree().print()

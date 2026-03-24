@@ -1,10 +1,11 @@
 # Notebooks (contain credentials and outputs)
 notebooks/
 
-# Certificates
+# Certificates (except the public root CA)
 *.crt
 *.pem
 *.key
+!certs/alpamayo-root-ca.crt
 
 # Python
 __pycache__/
