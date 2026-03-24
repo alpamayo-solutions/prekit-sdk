@@ -190,3 +190,170 @@ class TestManagerGet:
         result = manager.get(id="01DIRECT000000000000000")
         assert result.name == "Direct"
         mock_api_instance.get_one.assert_called_once_with(id="01DIRECT000000000000000")
+
+
+class TestManagerGetById404:
+    """Test the NotFoundException bug fix: 404 -> DoesNotExist, other codes re-raise."""
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_get_by_id_404_raises_does_not_exist(self, mock_prekit):
+        from prekit_edge_node_api import ApiException
+
+        mock_api_instance = MagicMock()
+        mock_api_instance.get_one.side_effect = ApiException(status=404, reason="Not Found")
+        mock_prekit.SystemElementApi.return_value = mock_api_instance
+        mock_prekit.ApiException = ApiException
+
+        manager = ElementManager(MagicMock())
+        with pytest.raises(DoesNotExist, match="No Element with id="):
+            manager.get(id="01NONEXISTENT0000000000")
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_get_by_id_500_reraises(self, mock_prekit):
+        from prekit_edge_node_api import ApiException
+
+        mock_api_instance = MagicMock()
+        mock_api_instance.get_one.side_effect = ApiException(status=500, reason="Internal Server Error")
+        mock_prekit.SystemElementApi.return_value = mock_api_instance
+        mock_prekit.ApiException = ApiException
+
+        manager = ElementManager(MagicMock())
+        with pytest.raises(ApiException) as exc_info:
+            manager.get(id="01SERVERERR00000000000")
+        assert exc_info.value.status == 500
+
+
+class TestManagerCreate:
+    """Test create() on ElementManager, SignalManager, and base Manager."""
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_element_create(self, mock_prekit):
+        from tests.factories import make_system_element
+
+        raw_returned = make_system_element("New", "01NEW00000000000000000", parent="01PARENT0000000000000000")
+        mock_api_instance = MagicMock()
+        mock_api_instance.post_one.return_value = raw_returned
+        mock_prekit.SystemElementApi.return_value = mock_api_instance
+        mock_prekit.SystemElementCreate = MagicMock(return_value="fake_create_payload")
+
+        manager = ElementManager(MagicMock())
+        result = manager.create(name="New", parent="01PARENT0000000000000000")
+
+        assert isinstance(result, Element)
+        assert result.name == "New"
+        mock_prekit.SystemElementCreate.assert_called_once()
+        call_kwargs = mock_prekit.SystemElementCreate.call_args[1]
+        assert call_kwargs["name"] == "New"
+        assert call_kwargs["parent"] == "01PARENT0000000000000000"
+        mock_api_instance.post_one.assert_called_once_with(data="fake_create_payload")
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_signal_create(self, mock_prekit):
+        from tests.factories import make_signal as factory_make_signal
+
+        raw_returned = factory_make_signal("Temp", system_element="01ELEM00000000000000000", data_type="float", unit="C")
+        mock_api_instance = MagicMock()
+        mock_api_instance.post_one.return_value = raw_returned
+        mock_prekit.SignalApi.return_value = mock_api_instance
+        mock_prekit.SignalCreate = MagicMock(return_value="fake_signal_payload")
+
+        manager = SignalManager(MagicMock())
+        result = manager.create(name="Temp", element="01ELEM00000000000000000", data_type="float", unit="C")
+
+        assert isinstance(result, Signal)
+        assert result.name == "Temp"
+        mock_prekit.SignalCreate.assert_called_once()
+        call_kwargs = mock_prekit.SignalCreate.call_args[1]
+        assert call_kwargs["name"] == "Temp"
+        assert call_kwargs["system_element"] == "01ELEM00000000000000000"
+        assert call_kwargs["data_type"] == "float"
+        assert call_kwargs["unit"] == "C"
+        mock_api_instance.post_one.assert_called_once_with(data="fake_signal_payload")
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_base_create_raises(self, mock_prekit):
+        from prekit_sdk.managers import Manager
+
+        mock_prekit.return_value = MagicMock()
+        # Manager.api_class_name is empty, so we need to set it for init
+        manager = Manager.__new__(Manager)
+        manager._client = MagicMock()
+
+        with pytest.raises(NotImplementedError, match="create\\(\\) is not implemented"):
+            manager.create()
+
+
+class TestManagerAllPaginated:
+    """Test .all() unwrapping of paginated API responses."""
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_all_paginated_objects(self, mock_prekit):
+        from tests.factories import make_system_element
+
+        elements = [make_system_element("A"), make_system_element("B")]
+        paginated = MagicMock()
+        paginated.objects = elements
+        # Ensure it's not a plain list
+        type(paginated).__iter__ = None
+
+        mock_api_instance = MagicMock()
+        mock_api_instance.get_all.return_value = paginated
+        mock_prekit.SystemElementApi.return_value = mock_api_instance
+
+        manager = ElementManager(MagicMock())
+        results = manager.all()
+
+        assert len(results) == 2
+        assert all(isinstance(r, Element) for r in results)
+        assert results[0].name == "A"
+        assert results[1].name == "B"
+
+    @patch("prekit_sdk.managers.prekit")
+    def test_all_paginated_data(self, mock_prekit):
+        from tests.factories import make_signal as factory_make_signal
+
+        signals = [factory_make_signal("X"), factory_make_signal("Y"), factory_make_signal("Z")]
+        paginated = MagicMock(spec=[])  # spec=[] removes default MagicMock attributes
+        paginated.data = signals
+
+        mock_api_instance = MagicMock()
+        mock_api_instance.get_all.return_value = paginated
+        mock_prekit.SignalApi.return_value = mock_api_instance
+
+        manager = SignalManager(MagicMock())
+        results = manager.all()
+
+        assert len(results) == 3
+        assert all(isinstance(r, Signal) for r in results)
+        assert [r.name for r in results] == ["X", "Y", "Z"]
+
+
+class TestApplyLookupEdgeCases:
+    """Edge cases for _apply_lookup: case-insensitive variants, None fields, unknown lookups."""
+
+    def test_istartswith(self):
+        elem = Element(make_element("CNC-Mill"), MagicMock())
+        assert _apply_lookup(elem, "name", "istartswith", "cnc") is True
+        assert _apply_lookup(elem, "name", "istartswith", "CNC") is True
+        assert _apply_lookup(elem, "name", "istartswith", "mill") is False
+
+    def test_iexact(self):
+        elem = Element(make_element("CNC-Mill"), MagicMock())
+        assert _apply_lookup(elem, "name", "iexact", "cnc-mill") is True
+        assert _apply_lookup(elem, "name", "iexact", "CNC-MILL") is True
+        assert _apply_lookup(elem, "name", "iexact", "CNC-Mill") is True
+        assert _apply_lookup(elem, "name", "iexact", "CNC") is False
+
+    def test_none_field_returns_false(self):
+        elem = Element(make_element("Test"), MagicMock())
+        # 'parent' is None by default in make_element
+        assert _apply_lookup(elem, "parent", "contains", "anything") is False
+        assert _apply_lookup(elem, "parent", "startswith", "any") is False
+        assert _apply_lookup(elem, "parent", "icontains", "any") is False
+        assert _apply_lookup(elem, "parent", "istartswith", "any") is False
+        assert _apply_lookup(elem, "parent", "iexact", "any") is False
+
+    def test_unknown_lookup_returns_false(self):
+        elem = Element(make_element("Test"), MagicMock())
+        assert _apply_lookup(elem, "name", "endswith", "est") is False
+        assert _apply_lookup(elem, "name", "regex", ".*") is False

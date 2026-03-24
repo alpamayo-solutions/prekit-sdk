@@ -132,8 +132,10 @@ class Manager:
             try:
                 raw = self._api().get_one(id=kwargs["id"])
                 return self._wrap(raw)
-            except prekit.NotFoundException:
-                raise DoesNotExist(f"No {self.model_class.__name__} with id={kwargs['id']!r}")
+            except prekit.ApiException as exc:
+                if exc.status == 404:
+                    raise DoesNotExist(f"No {self.model_class.__name__} with id={kwargs['id']!r}")
+                raise
 
         results = self.filter(**kwargs)
 
