@@ -286,7 +286,6 @@ class TestPrekitHealth:
         client = _make_client()
 
         mock_api_instance = MagicMock()
-        mock_api_instance.get_one.return_value = None  # Success, doesn't matter what it returns
         mock_prekit.IsHealthyApi.return_value = mock_api_instance
 
         assert client.is_healthy() is True
@@ -296,7 +295,7 @@ class TestPrekitHealth:
         client = _make_client()
 
         mock_api_instance = MagicMock()
-        mock_api_instance.get_one.side_effect = ConnectionError("Connection refused")
+        mock_api_instance.get_one_without_preload_content.side_effect = ConnectionError("Connection refused")
         mock_prekit.IsHealthyApi.return_value = mock_api_instance
 
         assert client.is_healthy() is False
@@ -306,8 +305,10 @@ class TestPrekitHealth:
         client = _make_client()
 
         health_data = {"status": "healthy", "services": {"api": "up", "mqtt": "up"}}
+        mock_resp = MagicMock()
+        mock_resp.data = json.dumps(health_data).encode()
         mock_api_instance = MagicMock()
-        mock_api_instance.get_one.return_value = health_data
+        mock_api_instance.get_all_without_preload_content.return_value = mock_resp
         mock_prekit.ServicesHealthApi.return_value = mock_api_instance
 
         result = client.health()
@@ -315,29 +316,26 @@ class TestPrekitHealth:
         assert result == health_data
 
     @patch("prekit_sdk.client.prekit")
-    def test_health_with_to_dict(self, mock_prekit):
+    def test_health_with_services_list(self, mock_prekit):
         client = _make_client()
 
-        mock_result = MagicMock()
-        mock_result.to_dict.return_value = {"status": "healthy", "uptime": 3600}
-        # Ensure isinstance(result, dict) is False so it falls through to to_dict
-        mock_result.__class__ = type("ServicesHealthResponse", (), {})
-
+        services = [{"name": "api", "status": "healthy"}, {"name": "broker", "status": "healthy"}]
+        mock_resp = MagicMock()
+        mock_resp.data = json.dumps(services).encode()
         mock_api_instance = MagicMock()
-        mock_api_instance.get_one.return_value = mock_result
+        mock_api_instance.get_all_without_preload_content.return_value = mock_resp
         mock_prekit.ServicesHealthApi.return_value = mock_api_instance
 
         result = client.health()
 
-        assert result == {"status": "healthy", "uptime": 3600}
-        mock_result.to_dict.assert_called_once()
+        assert result == services
 
     @patch("prekit_sdk.client.prekit")
     def test_health_on_error(self, mock_prekit):
         client = _make_client()
 
         mock_api_instance = MagicMock()
-        mock_api_instance.get_one.side_effect = ConnectionError("API unreachable")
+        mock_api_instance.get_all_without_preload_content.side_effect = ConnectionError("API unreachable")
         mock_prekit.ServicesHealthApi.return_value = mock_api_instance
 
         result = client.health()

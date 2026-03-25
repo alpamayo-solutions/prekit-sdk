@@ -16,6 +16,24 @@ from .auth import (
 from .managers import ElementManager, SignalManager, TagContextManager, TagManager
 
 
+class UserProfile(dict):
+    """User profile dict with pretty printing."""
+
+    _DISPLAY_KEYS = ["preferred_username", "email", "first_name", "last_name", "roles"]
+
+    def __str__(self) -> str:
+        lines = []
+        for key in self._DISPLAY_KEYS:
+            val = self.get(key)
+            if val is not None:
+                display = ", ".join(val) if isinstance(val, list) else str(val)
+                lines.append(f"  {key:22s}  {display}")
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return dict.__repr__(self)
+
+
 class Prekit:
     """User-friendly client for the PREKIT edge computing platform.
 
@@ -226,32 +244,30 @@ class Prekit:
                 sig_name = v.get("signal_name", "?")
                 print(f"    {sig_name:34s}  {str(val):>12s} {unit}")
 
-    def whoami(self) -> dict:
+    def whoami(self) -> UserProfile:
         """Get the authenticated user's profile."""
         import json
 
         resp = prekit.UserProfileApi(api_client=self.api).get_one_without_preload_content()
-        return json.loads(resp.data.decode())
+        return UserProfile(json.loads(resp.data.decode()))
 
     # --- Health ---
 
     def is_healthy(self) -> bool:
         """Check if the PREKIT API is healthy."""
         try:
-            prekit.IsHealthyApi(api_client=self.api).get_one()
+            prekit.IsHealthyApi(api_client=self.api).get_one_without_preload_content()
             return True
         except Exception:
             return False
 
     def health(self) -> dict:
         """Get detailed health status."""
+        import json
+
         try:
-            result = prekit.ServicesHealthApi(api_client=self.api).get_one()
-            if isinstance(result, dict):
-                return result
-            if hasattr(result, "to_dict"):
-                return result.to_dict()
-            return {"status": "healthy"}
+            resp = prekit.ServicesHealthApi(api_client=self.api).get_all_without_preload_content()
+            return json.loads(resp.data.decode())
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
 
@@ -301,6 +317,12 @@ class Prekit:
         # Normalize URL — the generated client already includes /api/v1 in
         # every endpoint path, so the host should be just the base domain.
         api_url = url.rstrip("/")
+
+        # Handle ca_cert="alpamayo" shorthand — auto-download the root CA
+        if ca_cert == "alpamayo":
+            from .certs import ensure_ca_cert
+
+            ca_cert = ensure_ca_cert()
 
         # Build configuration
         config = prekit.Configuration(host=api_url)
@@ -400,3 +422,22 @@ class Prekit:
     def __repr__(self) -> str:
         host = self.api.configuration.host if self.api else "not connected"
         return f"<Prekit: {host}>"
+
+    def __str__(self) -> str:
+        host = self.api.configuration.host if self.api else "not connected"
+        healthy = self.is_healthy()
+        lines = [
+            f"PREKIT SDK",
+            f"  URL:     {host}",
+            f"  Health:  {'healthy' if healthy else 'unreachable'}",
+        ]
+        try:
+            profile = self.whoami()
+            lines.append(f"  User:    {profile.get('preferred_username', '?')}")
+            lines.append(f"  Email:   {profile.get('email', '?')}")
+            roles = profile.get("roles", [])
+            if roles:
+                lines.append(f"  Roles:   {', '.join(roles)}")
+        except Exception:
+            lines.append("  User:    (auth info unavailable)")
+        return "\n".join(lines)

@@ -74,6 +74,9 @@ class Tree:
         lines = _render_tree(self.root, signals=signals)
         print("\n".join(lines))
 
+    def __str__(self) -> str:
+        return "\n".join(_render_tree(self.root, signals=False))
+
     def to_string(self, signals: bool = False) -> str:
         """Return the tree as a string (for testing)."""
         return "\n".join(_render_tree(self.root, signals=signals))
