@@ -427,7 +427,7 @@ class Prekit:
         host = self.api.configuration.host if self.api else "not connected"
         healthy = self.is_healthy()
         lines = [
-            f"PREKIT SDK",
+            "PREKIT SDK",
             f"  URL:     {host}",
             f"  Health:  {'healthy' if healthy else 'unreachable'}",
         ]
