@@ -18,16 +18,14 @@ User-friendly Python SDK for the PREKIT edge computing platform. Django-inspired
 ## Installation
 
 ```bash
-# Install the API client wheel first (from GitHub Releases or local build)
-pip install prekit_edge_node_api-1.10.0-py3-none-any.whl
-
-# Install the SDK
 pip install prekit-sdk
+```
 
-# Or from git
-pip install git+https://github.com/alpamayo-solutions/prekit-sdk.git
+The generated API client (`prekit-edge-node-api`) is bundled inside the package -- no separate install needed.
 
-# Or for local development
+For development:
+
+```bash
 pip install -e "./prekit-sdk[dev]"
 ```
 
@@ -339,15 +337,11 @@ The SDK is designed to be resilient to API client regeneration:
 
 ```bash
 # Setup
-pip install tests/edge-node/api-client-whl/*.whl
-pip install -e "./prekit-sdk[dev]"
+pip install -e ".[dev]"
 
 # Run tests
-pytest prekit-sdk/tests/ -v
+pytest tests/ -v
 
 # Lint
-ruff check prekit-sdk/src/
-
-# Demo notebook
-jupyter notebook prekit-sdk/notebooks/demo.ipynb
+ruff check src/
 ```
